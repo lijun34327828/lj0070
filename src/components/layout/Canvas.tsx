@@ -1,10 +1,11 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { LineChart, PieChart, BarChart, DataCard, TextBlock } from '../charts';
 import type { CanvasComponent, ThemeConfig } from '@shared/index';
 import { useCanvasStore } from '@/store/useCanvasStore';
 
 interface CanvasProps {
+  canvasRef: React.RefObject<HTMLDivElement>;
   theme: ThemeConfig;
   dragState: { isDragging: boolean; position: { x: number; y: number } };
   onDragOver: (e: React.DragEvent) => void;
@@ -13,13 +14,13 @@ interface CanvasProps {
 }
 
 export function Canvas({ 
+  canvasRef,
   theme, 
   dragState, 
   onDragOver, 
   onDrop, 
   onComponentMouseDown 
 }: CanvasProps) {
-  const canvasRef = useRef<HTMLDivElement>(null);
   const components = useCanvasStore(state => state.components);
   const selectedId = useCanvasStore(state => state.selectedId);
   const selectComponent = useCanvasStore(state => state.selectComponent);

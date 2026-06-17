@@ -36,13 +36,11 @@ export function Editor() {
         <ComponentPanel onDragStart={handleDragStart} />
         
         <div 
-          ref={canvasRef}
           className="flex-1 relative"
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
           onDragEnd={handleDragEnd}
         >
           <Canvas
+            canvasRef={canvasRef}
             theme={theme}
             dragState={dragState}
             onDragOver={handleDragOver}
