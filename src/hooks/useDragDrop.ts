@@ -17,6 +17,8 @@ export function useDragDrop(canvasRef: React.RefObject<HTMLDivElement>) {
   
   const addComponent = useCanvasStore(state => state.addComponent);
   const moveComponent = useCanvasStore(state => state.moveComponent);
+  const beginContinuousChange = useCanvasStore(state => state.beginContinuousChange);
+  const endContinuousChange = useCanvasStore(state => state.endContinuousChange);
   
   const movingComponentRef = useRef<{
     id: string;
@@ -90,6 +92,8 @@ export function useDragDrop(canvasRef: React.RefObject<HTMLDivElement>) {
       offsetY: e.clientY - rect.top - component.y
     };
 
+    beginContinuousChange();
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!movingComponentRef.current || !canvasRef.current) return;
       
@@ -104,11 +108,12 @@ export function useDragDrop(canvasRef: React.RefObject<HTMLDivElement>) {
       movingComponentRef.current = null;
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      endContinuousChange();
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [canvasRef, moveComponent]);
+  }, [canvasRef, moveComponent, beginContinuousChange, endContinuousChange]);
 
   return {
     dragState,

@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import type { CanvasComponent, CanvasState, ThemeName, ComponentType } from '@shared/index';
 import { defaultColors } from '@/types';
 
+const MAX_HISTORY_LENGTH = 50;
+
+interface HistorySnapshot {
+  components: CanvasComponent[];
+  selectedId: string | null;
+}
+
 function generateId(): string {
   return `comp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -44,6 +51,11 @@ function getDefaultSize(type: ComponentType) {
 }
 
 interface CanvasStore extends CanvasState {
+  history: HistorySnapshot[];
+  historyIndex: number;
+  isContinuousChange: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
   setTheme: (theme: ThemeName) => void;
   addComponent: (type: ComponentType, x: number, y: number) => void;
   removeComponent: (id: string) => void;
@@ -54,12 +66,95 @@ interface CanvasStore extends CanvasState {
   updateComponentConfig: (id: string, config: Partial<CanvasComponent['config']>) => void;
   updateDataBinding: (id: string, binding: Partial<CanvasComponent['dataBinding']>) => void;
   clearAll: () => void;
+  beginContinuousChange: () => void;
+  endContinuousChange: () => void;
+  undo: () => void;
+  redo: () => void;
+}
+
+function createSnapshot(state: CanvasState): HistorySnapshot {
+  return {
+    components: JSON.parse(JSON.stringify(state.components)),
+    selectedId: state.selectedId
+  };
+}
+
+function pushHistory(
+  set: (partial: Partial<CanvasStore>) => void,
+  get: () => CanvasStore
+) {
+  const state = get();
+  if (state.isContinuousChange) return;
+
+  const snapshot = createSnapshot(state);
+  const newHistory = state.history.slice(0, state.historyIndex + 1);
+  
+  if (newHistory.length > 0) {
+    const lastSnapshot = newHistory[newHistory.length - 1];
+    if (JSON.stringify(lastSnapshot) === JSON.stringify(snapshot)) {
+      return;
+    }
+  }
+
+  newHistory.push(snapshot);
+  if (newHistory.length > MAX_HISTORY_LENGTH) {
+    newHistory.shift();
+  }
+
+  set({
+    history: newHistory,
+    historyIndex: newHistory.length - 1
+  });
 }
 
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   components: [],
   selectedId: null,
   theme: 'minimal',
+  history: [{ components: [], selectedId: null }],
+  historyIndex: 0,
+  isContinuousChange: false,
+  get canUndo() {
+    return get().historyIndex > 0;
+  },
+  get canRedo() {
+    return get().historyIndex < get().history.length - 1;
+  },
+
+  beginContinuousChange: () => {
+    set({ isContinuousChange: true });
+  },
+
+  endContinuousChange: () => {
+    set({ isContinuousChange: false });
+    pushHistory(set, get);
+  },
+
+  undo: () => {
+    const state = get();
+    if (state.historyIndex <= 0) return;
+
+    const newIndex = state.historyIndex - 1;
+    const snapshot = state.history[newIndex];
+    set({
+      components: JSON.parse(JSON.stringify(snapshot.components)),
+      selectedId: snapshot.selectedId,
+      historyIndex: newIndex
+    });
+  },
+
+  redo: () => {
+    const state = get();
+    if (state.historyIndex >= state.history.length - 1) return;
+
+    const newIndex = state.historyIndex + 1;
+    const snapshot = state.history[newIndex];
+    set({
+      components: JSON.parse(JSON.stringify(snapshot.components)),
+      selectedId: snapshot.selectedId,
+      historyIndex: newIndex
+    });
+  },
 
   setTheme: (theme: ThemeName) => {
     set({ theme });
@@ -73,6 +168,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }
     }));
     set({ components: updatedComponents });
+    pushHistory(set, get);
   },
 
   addComponent: (type: ComponentType, x: number, y: number) => {
@@ -95,6 +191,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       components: [...state.components, newComponent],
       selectedId: newComponent.id
     }));
+    pushHistory(set, get);
   },
 
   removeComponent: (id: string) => {
@@ -102,6 +199,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       components: state.components.filter(c => c.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId
     }));
+    pushHistory(set, get);
   },
 
   updateComponent: (id: string, updates: Partial<CanvasComponent>) => {
@@ -138,6 +236,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         c.id === id ? { ...c, config: { ...c.config, ...config } } : c
       )
     }));
+    pushHistory(set, get);
   },
 
   updateDataBinding: (id: string, binding: Partial<CanvasComponent['dataBinding']>) => {
@@ -146,9 +245,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         c.id === id ? { ...c, dataBinding: { ...c.dataBinding, ...binding } } : c
       )
     }));
+    pushHistory(set, get);
   },
 
   clearAll: () => {
     set({ components: [], selectedId: null });
+    pushHistory(set, get);
   }
 }));

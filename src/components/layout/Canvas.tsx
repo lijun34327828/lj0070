@@ -26,6 +26,8 @@ export function Canvas({
   const selectComponent = useCanvasStore(state => state.selectComponent);
   const removeComponent = useCanvasStore(state => state.removeComponent);
   const resizeComponent = useCanvasStore(state => state.resizeComponent);
+  const beginContinuousChange = useCanvasStore(state => state.beginContinuousChange);
+  const endContinuousChange = useCanvasStore(state => state.endContinuousChange);
   
   const [resizing, setResizing] = useState<{
     id: string;
@@ -54,6 +56,7 @@ export function Canvas({
 
   const handleResizeStart = useCallback((e: React.MouseEvent, component: CanvasComponent) => {
     e.stopPropagation();
+    beginContinuousChange();
     setResizing({
       id: component.id,
       startX: e.clientX,
@@ -61,7 +64,7 @@ export function Canvas({
       startWidth: component.width,
       startHeight: component.height
     });
-  }, []);
+  }, [beginContinuousChange]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -78,6 +81,7 @@ export function Canvas({
 
     const handleMouseUp = () => {
       setResizing(null);
+      endContinuousChange();
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -87,7 +91,7 @@ export function Canvas({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizing, resizeComponent]);
+  }, [resizing, resizeComponent, endContinuousChange]);
 
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
